@@ -1,7 +1,9 @@
+use std::collections::btree_map;
 use std::env;
 use std::io::{self, Write};
 use std::fs::File;
 use std::f64::consts::PI;
+use std::iter::Enumerate;
 
 extern crate gnuplot;
 use gnuplot::{Figure, AxesCommon, Caption, Color, Fix};
@@ -79,31 +81,83 @@ fn main() {
     let mut stopping_powers = Vec::with_capacity(1000);
 
     // // Open file for writing results
-    let mut file = File::create("fstopping.txt").expect("Unable to create file");
+    let mut file = File::create("fstopping_no_corrections.txt").expect("Unable to create file");
+
+    // BETHE-BLOCH WITHOUT CORRECTIONS
+    println!("Bethe-Bloch without corrections");
 
     let n_points = 1000;
     for i in 0..n_points {
         // Calculate proton energy in eV
         let energy_eV = PROTON_ENERGY_MeV_I * ((i as f64 + 1.0) * 10.0) * 1e6;
-        // Calculate beta (v/c) using relativistic kinematics:
+
+        // Calculate beta (v/c)
         // beta = sqrt(E*(E + 2*m)) / (E + m)
         let beta = ((energy_eV * (energy_eV + 2.0 * proton_mass)).sqrt())
                    / (energy_eV + proton_mass);
+
         // Bethe-Bloch formula for the stopping power (dE/dx)
         let de_dx = (const_general * Z_PROTON.powi(2) * ELECTRON_PER_VOLUME_H20 / (beta * beta))
                     * ((2.0 * electron_mass_eV * beta * beta / WATER_EXCITATION_ENERGY).ln()
                        - (1.0 - beta * beta).ln()
                        - beta * beta);
+
         let energy_MeV = energy_eV / 1e6;
+
         energies.push(energy_MeV);
         stopping_powers.push(de_dx);
+
         // Write to file
         writeln!(file, "{:.1}\t{:e}", energy_MeV, de_dx).expect("Unable to write data");
+        
         println!("{:.1} MeV (dE/dx): {} MeV/cm", energy_MeV, de_dx);
     }
 
     plot(&energies, &stopping_powers, "Protones en Agua (Bethe-Bloch)", 
     "Poder de Frenado en función de la energía SIN correcciones");
+
+    // BETHE-BLOCH WITH DENSISTY 
+
+    energies.clear();
+    stopping_powers.clear();
+
+    file = File::create("fstopping_density_corrections.txt").expect("Unable to create file");
+    
+    println!("Bethe-Bloch with Density Corrections");
+    
+    for i in 0..n_points{
+        let energy_eV = PROTON_ENERGY_MeV_I * ((i as f64 + 1.0) * 10.0) * 1e6;
+
+        let beta = ((energy_eV * (energy_eV + 2.0 * proton_mass)).sqrt())
+                   / (energy_eV + proton_mass);
+
+        let bg = beta * (1.0 / (1.0 - beta * beta).sqrt());
+
+        let x = bg.log10();
+        let delta = if x >= x1{
+            2.0 * 10.0_f64.log10() * x - c_param // TODO: Revisar el parametro c_param, debería calcularse y no restarse ?  
+        } else if x0 <= x {
+            2.0 * 10.0_f64.log10() * x - c_param + a * f64::powf(x1 - x,m_param) 
+        } else{
+            0.0_f64
+        };
+
+        let de_dx = ((const_general * Z_PROTON.powi(2) * ELECTRON_PER_VOLUME_H20) / (beta.powi(2)))
+                * ((2.0 * electron_mass_eV * beta.powi(2) / WATER_EXCITATION_ENERGY).ln()
+                - (1.0 - beta.powi(2)).ln() - beta.powi(2) - delta);
+
+        let energy_MeV = energy_eV / 1e6;
+
+        energies.push(energy_MeV);
+        stopping_powers.push(de_dx);
+
+        // Write to file
+        writeln!(file, "{:.1}\t{:e}", energy_MeV, de_dx).expect("Unable to write data");
+        println!("{:.1} MeV (dE/dx): {} MeV/cm", energy_MeV, de_dx);
+    }
+
+
+
 }
 
 // Helper function to prompt the user for a value with a default.
@@ -132,20 +186,24 @@ fn plot(energies: &Vec<f64>, stopping_powers: &Vec<f64>,
     let mut fg = Figure::new();
     {
         let axes = fg.axes2d();
+
         // Set logarithmic scales for both axes
         axes.set_x_log(Some(2.0));
         axes.set_y_log(Some(2.0));
+        
         // Set axis ranges
         axes.set_x_range(Fix(10.0), Fix(10500.0));
         axes.set_y_range(Fix(1e-30),Fix(1e-27));
+        
         // Set titles and labels
         axes.set_title(title, &[]);
         axes.set_x_label("Energía (MeV)", &[]);
         axes.set_y_label("Poder de frenado (MeV/cm)", &[]);
+        
         // Plot the data in blue with a label
         axes.lines(energies, stopping_powers, &[Caption(caption), Color("blue")]);
     }
     // Set terminal to PNG (size 1000x600) and display the plot
-    fg.set_terminal("pngcairo size 1000,600", "plot.png");
+    fg.set_terminal("pngcairo size 1000,600", &format!("{}.png",title));
     fg.show().expect("Unable to show plot");
 }
