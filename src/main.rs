@@ -197,6 +197,54 @@ fn main() {
     plot(&energies, &stopping_powers, "Protones en Agua (Bethe-Bloch) Correcion Capa", 
     "Poder de Frenado en función de la energía con correccion de capa");
 
+        // BETHE-BLOCH WITH ALL CORRECTIONS
+
+        energies.clear();
+        stopping_powers.clear();
+    
+        file = File::create("fstopping_all_corrections.txt").expect("Unable to create file");
+    
+        println!("Bethe-Bloch with All Correction");
+    
+        for i in 0..n_points{
+            let energy_eV = PROTON_ENERGY_MeV_I * ((i as f64 + 1.0) * 10.0) * 1e6;
+    
+            let beta = ((energy_eV * (energy_eV + 2.0 * proton_mass)).sqrt())
+                        / (energy_eV + proton_mass);
+            
+            let bg = beta * (1.0 / (1.0 - beta * beta).sqrt());
+
+            // delta density correction
+            let x = bg.log10();
+            let delta = if x >= x1{
+                2.0 * 10.0_f64.log10() * x - c_param // TODO: Revisar el parametro c_param, debería calcularse y no restarse ?  
+            } else if x0 <= x {
+                2.0 * 10.0_f64.log10() * x - c_param + a * f64::powf(x1 - x,m_param) 
+            } else{
+                0.0_f64
+            };
+    
+            // shell correction
+            let sc = (0.422377*bg.powi(-2) + 0.0304043*bg.powi(-4) - 0.00038106*bg.powi(-6))*(10.0_f64.powi(-6))*((I.powi(2)*10.0_f64.powi(-6))) 
+                        + (3.850190*bg.powi(-2)-0.1667989*bg.powi(-4) + 0.00157955*bg.powi(-6))*(10.0_f64.powi(-9))*((I.powi(3)*10.0_f64.powi(-6)));
+    
+            let de_dx = ((const_general * Z_PROTON.powi(2) * ELECTRON_PER_VOLUME_H20) / (beta.powi(2)))
+            * ((2.0 * electron_mass_eV * beta.powi(2) / WATER_EXCITATION_ENERGY).ln()
+            - (1.0 - beta.powi(2)).ln() - beta.powi(2) - delta - 2.0*(sc / WATER_ATOMIC_NUMBER));
+    
+            let energy_MeV = energy_eV / 1e6;
+    
+            energies.push(energy_MeV);
+            stopping_powers.push(de_dx);
+    
+                
+            writeln!(file, "{:.1}\t{:e}", energy_MeV, de_dx).expect("Unable to write data");
+            println!("{:.1} MeV (dE/dx): {} MeV/cm", energy_MeV, de_dx);
+        }
+    
+        plot(&energies, &stopping_powers, "Protones en Agua (Bethe-Bloch) Correciones Densidad y Capa", 
+        "Poder de Frenado en función de la energía con correcciones de densidad y capa");
+
 }
 
 // Helper function to prompt the user for a value with a default.
@@ -205,7 +253,7 @@ fn prompt(message: &str, default: f64) -> f64 {
     let mut input = String::new();
     io::stdin().read_line(&mut input).expect("Failed to read line");
 
-    let trimmed = input.trim();          // Suggested
+    let trimmed = input.trim();          
     if trimmed.is_empty() {
        default
     } else {
