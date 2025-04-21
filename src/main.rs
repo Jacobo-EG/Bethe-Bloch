@@ -259,12 +259,6 @@ fn prompt(message: &str, default: f64) -> f64 {
     } else {
         trimmed.parse().unwrap_or(default)
     }
-
-    // My implementation 
-    // match input.trim().parse(){
-    //     Ok(num) => num,
-    //     Error(_) => default
-    // }
 }
 
 fn plot(energies: &Vec<f64>, stopping_powers: &Vec<f64>, 
