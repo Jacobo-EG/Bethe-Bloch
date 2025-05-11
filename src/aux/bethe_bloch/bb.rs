@@ -96,9 +96,9 @@ pub fn bethe_bloch_density_corrections(n_points: &u32, energies: &mut Vec<f64>, 
 
         let x = bg.log10();
         let delta = if x >= x1{
-            2.0 * 10.0_f64.log10() * x - c_param // TODO: Revisar el parametro c_param, debería calcularse y no restarse ?  
+            2.0 * 10.0_f64.log10() * x + c_param   
         } else if x0 <= x {
-            2.0 * 10.0_f64.log10() * x - c_param + a * f64::powf(x1 - x,m_param) 
+            2.0 * 10.0_f64.log10() * x + c_param + a * f64::powf(x1 - x,m_param) 
         } else{
             0.0_f64
         };
@@ -207,9 +207,9 @@ pub fn bethe_bloch_all_corrections(n_points: &u32, energies: &mut Vec<f64>, stop
         // delta density correction
         let x = bg.log10();
         let delta = if x >= x1{
-            2.0 * 10.0_f64.log10() * x - c_param // TODO: Revisar el parametro c_param, debería calcularse y no restarse ?  
+            2.0 * 10.0_f64.log10() * x + c_param   
         } else if x0 <= x {
-            2.0 * 10.0_f64.log10() * x - c_param + a * f64::powf(x1 - x,m_param) 
+            2.0 * 10.0_f64.log10() * x + c_param + a * f64::powf(x1 - x,m_param) 
         } else{
             0.0_f64
         };
